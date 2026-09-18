@@ -13,6 +13,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+# --- PROFILS CONSTRUCTEURS ENRICHIS ---
 PROFILS_CONSTRUCTEURS = {
     "ABB / Standard": {
         "B_tesla": 1.64,
@@ -20,6 +21,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.5,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.0,
+        "marge_spires": 2.5,
     },
     "Schneider / France Transfo": {
         "B_tesla": 1.62,
@@ -27,6 +29,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.7,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.2,
+        "marge_spires": 3.0,
     },
     "Siemens": {
         "B_tesla": 1.65,
@@ -34,6 +37,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.6,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.0,
+        "marge_spires": 2.5,
     },
     "SACEM": {
         "B_tesla": 1.60,
@@ -41,6 +45,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.55,
         "J_alu_bt": 2.45,
         "J_cu_bt": 2.9,
+        "marge_spires": 3.5,
     },
     "Nexans": {
         "B_tesla": 1.63,
@@ -48,6 +53,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.65,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.1,
+        "marge_spires": 3.0,
     },
     "Energie Transfo": {
         "B_tesla": 1.61,
@@ -55,6 +61,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.5,
         "J_alu_bt": 2.4,
         "J_cu_bt": 2.85,
+        "marge_spires": 4.0,
     },
     "Générique / Inconnu": {
         "B_tesla": 1.60,
@@ -62,6 +69,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.5,
         "J_alu_bt": 2.4,
         "J_cu_bt": 2.8,
+        "marge_spires": 3.0,
     },
 }
 
@@ -85,10 +93,20 @@ def estimer_meplat(section_mm2):
     return ep, section_mm2 / ep
 
 
+def changer_constructeur(event):
+    constructeur = combo_constructeur.get()
+    profil = PROFILS_CONSTRUCTEURS.get(
+        constructeur, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
+    )
+    marge_defaut = profil.get("marge_spires", 3.0)
+
+    entry_marge.delete(0, tk.END)
+    entry_marge.insert(0, str(marge_defaut))
+
+
 def convertir_alu_cuivre():
     try:
         d_alu = float(entry_conv_alu.get())
-        # Conversion empirique d'atelier (~78% du diamètre Alu)
         d_cu = d_alu * 0.78
         sec_alu = math.pi * ((d_alu / 2) ** 2)
         sec_cu = math.pi * ((d_cu / 2) ** 2)
@@ -113,7 +131,6 @@ def lancer_calcul():
         mat_prim = combo_mat_ht.get()
         mat_sec = combo_mat_bt.get()
         constructeur = combo_constructeur.get()
-        marge_spires = float(entry_marge.get()) / 100.0
 
         profil = PROFILS_CONSTRUCTEURS.get(
             constructeur, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
@@ -141,10 +158,21 @@ def lancer_calcul():
         s_fer_m2 = s_fer_cm2 / 10000.0
 
         e_t = 4.44 * 50 * b_tesla * s_fer_m2
-
-        # Prise en compte de la correction / surcompensation à vide
         n2_theorique = v2_phase / e_t
-        n2 = round(n2_theorique * (1 + marge_spires))
+
+        spires_bt_saisies = entry_spires_bt_saisie.get().strip()
+
+        if spires_bt_saisies != "":
+            n2 = int(spires_bt_saisies)
+            marge_calculee = ((n2 / n2_theorique) - 1) * 100
+            entry_marge.delete(0, tk.END)
+            entry_marge.insert(0, f"{marge_calculee:.1f}")
+            info_bt = f"{n2} spires (Relevé atelier)"
+        else:
+            marge_spires = float(entry_marge.get()) / 100.0
+            n2 = round(n2_theorique * (1 + marge_spires))
+            info_bt = f"{n2} spires (Calculé)"
+
         n1 = round(n2 * (u1_volts / v2_phase))
 
         sec_ht_mm2 = i1_phase / j_prim
@@ -156,7 +184,7 @@ def lancer_calcul():
 
         lbl_sfer.config(text=f"{s_fer_cm2:.2f} cm²")
         lbl_et.config(text=f"{e_t:.3f} V/spire")
-        lbl_n2.config(text=f"{n2} spires (ajusté)")
+        lbl_n2.config(text=info_bt)
         lbl_n1.config(text=f"{n1} spires")
         lbl_i1.config(text=f"{i1_phase:.3f} A")
         lbl_i2.config(text=f"{i2_phase:.2f} A")
@@ -170,13 +198,14 @@ def lancer_calcul():
 
     except ValueError:
         messagebox.showerror(
-            "Erreur de saisie", "Veuillez vérifier vos données !"
+            "Erreur de saisie",
+            "Veuillez vérifier vos données ! Les valeurs doivent être numériques.",
         )
 
 
 root = tk.Tk()
 root.title("Calculateur de Rebobinage Transformateur - Atelier HTA")
-root.geometry("560x900")
+root.geometry("560x930")
 root.resizable(False, False)
 
 style = ttk.Style()
@@ -286,13 +315,20 @@ combo_constructeur = ttk.Combobox(
 )
 combo_constructeur.current(0)
 combo_constructeur.grid(row=9, column=1, pady=2)
+combo_constructeur.bind("<<ComboboxSelected>>", changer_constructeur)
 
 ttk.Label(frame_form, text="Ajustement Spires BT (%) :").grid(
     row=10, column=0, sticky="w", pady=2
 )
 entry_marge = ttk.Entry(frame_form)
-entry_marge.insert(0, "3.0")
+entry_marge.insert(0, "2.5")
 entry_marge.grid(row=10, column=1, pady=2)
+
+ttk.Label(
+    frame_form, text="Spires BT relevées (Optionnel) :", font=("Helvetica", 9, "bold")
+).grid(row=11, column=0, sticky="w", pady=2)
+entry_spires_bt_saisie = ttk.Entry(frame_form)
+entry_spires_bt_saisie.grid(row=11, column=1, pady=2)
 
 btn_calculer = tk.Button(
     root,
