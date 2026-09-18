@@ -5,7 +5,6 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 
-# Fonction pour gérer les chemins d'accès aux fichiers en mode .exe
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -14,7 +13,6 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-# --- PROFILS CONSTRUCTEURS ENRICHIS ---
 PROFILS_CONSTRUCTEURS = {
     "ABB / Standard": {
         "B_tesla": 1.64,
@@ -71,30 +69,36 @@ PROFILS_CONSTRUCTEURS = {
 def calculer_section_fer(largeur_cm, nb_toles, epaisseur_tole_mm, nb_etages):
     epaisseur_totale_cm = (nb_toles * epaisseur_tole_mm) / 10.0
     section_brute = largeur_cm * epaisseur_totale_cm
-
-    if nb_etages <= 3:
-        k_forme = 0.83
-    elif nb_etages <= 5:
-        k_forme = 0.88
-    else:
-        k_forme = 0.91
-
-    k_foisonnement = 0.95
-    return section_brute * k_forme * k_foisonnement
+    k_forme = 0.83 if nb_etages <= 3 else (0.88 if nb_etages <= 5 else 0.91)
+    return section_brute * k_forme * 0.95
 
 
 def estimer_meplat(section_mm2):
     if section_mm2 <= 15:
-        epaisseur = 2.0
+        ep = 2.0
     elif section_mm2 <= 40:
-        epaisseur = 3.0
+        ep = 3.0
     elif section_mm2 <= 80:
-        epaisseur = 4.0
+        ep = 4.0
     else:
-        epaisseur = 5.0
+        ep = 5.0
+    return ep, section_mm2 / ep
 
-    largeur = section_mm2 / epaisseur
-    return epaisseur, largeur
+
+def convertir_alu_cuivre():
+    try:
+        d_alu = float(entry_conv_alu.get())
+        # Conversion empirique d'atelier (~78% du diamètre Alu)
+        d_cu = d_alu * 0.78
+        sec_alu = math.pi * ((d_alu / 2) ** 2)
+        sec_cu = math.pi * ((d_cu / 2) ** 2)
+        lbl_res_conv.config(
+            text=f"Ø Cuivre : {d_cu:.2f} mm  (S_alu={sec_alu:.2f}mm² → S_cu={sec_cu:.2f}mm²)"
+        )
+    except ValueError:
+        messagebox.showerror(
+            "Erreur", "Veuillez entrer un diamètre valide en mm."
+        )
 
 
 def lancer_calcul():
@@ -109,6 +113,7 @@ def lancer_calcul():
         mat_prim = combo_mat_ht.get()
         mat_sec = combo_mat_bt.get()
         constructeur = combo_constructeur.get()
+        marge_spires = float(entry_marge.get()) / 100.0
 
         profil = PROFILS_CONSTRUCTEURS.get(
             constructeur, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
@@ -136,7 +141,10 @@ def lancer_calcul():
         s_fer_m2 = s_fer_cm2 / 10000.0
 
         e_t = 4.44 * 50 * b_tesla * s_fer_m2
-        n2 = round(v2_phase / e_t)
+
+        # Prise en compte de la correction / surcompensation à vide
+        n2_theorique = v2_phase / e_t
+        n2 = round(n2_theorique * (1 + marge_spires))
         n1 = round(n2 * (u1_volts / v2_phase))
 
         sec_ht_mm2 = i1_phase / j_prim
@@ -148,7 +156,7 @@ def lancer_calcul():
 
         lbl_sfer.config(text=f"{s_fer_cm2:.2f} cm²")
         lbl_et.config(text=f"{e_t:.3f} V/spire")
-        lbl_n2.config(text=f"{n2} spires")
+        lbl_n2.config(text=f"{n2} spires (ajusté)")
         lbl_n1.config(text=f"{n1} spires")
         lbl_i1.config(text=f"{i1_phase:.3f} A")
         lbl_i2.config(text=f"{i2_phase:.2f} A")
@@ -162,29 +170,25 @@ def lancer_calcul():
 
     except ValueError:
         messagebox.showerror(
-            "Erreur de saisie",
-            "Veuillez vérifier vos données ! Seuls les chiffres sont autorisés.",
+            "Erreur de saisie", "Veuillez vérifier vos données !"
         )
 
 
-# --- FENÊTRE PRINCIPALE ---
 root = tk.Tk()
 root.title("Calculateur de Rebobinage Transformateur - Atelier HTA")
-root.geometry("540x820")
+root.geometry("560x900")
 root.resizable(False, False)
 
 style = ttk.Style()
 style.theme_use("clam")
 
-# --- EN-TÊTE AVEC IMAGE ET TITRE ---
+# En-tête
 frame_header = tk.Frame(root, bg="#1E3A8A", pady=10)
 frame_header.pack(fill="x")
 
-# Chargement de l'image (si présente dans le dossier)
 image_path = resource_path("transfo.png")
 if os.path.exists(image_path):
     img_icon = tk.PhotoImage(file=image_path)
-    # Redimensionnement si nécessaire (sous-échantillonnage)
     img_icon_small = img_icon.subsample(4, 4)
     lbl_img = tk.Label(frame_header, image=img_icon_small, bg="#1E3A8A")
     lbl_img.pack(side="left", padx=15)
@@ -199,8 +203,8 @@ lbl_title = tk.Label(
 lbl_title.pack(side="left", padx=5)
 
 # Formulaire
-frame_form = ttk.LabelFrame(root, text=" Données d'entrée ", padding=12)
-frame_form.pack(fill="x", padx=15, pady=8)
+frame_form = ttk.LabelFrame(root, text=" Données d'entrée ", padding=10)
+frame_form.pack(fill="x", padx=15, pady=5)
 
 ttk.Label(frame_form, text="Puissance (kVA) :").grid(
     row=0, column=0, sticky="w", pady=2
@@ -283,7 +287,13 @@ combo_constructeur = ttk.Combobox(
 combo_constructeur.current(0)
 combo_constructeur.grid(row=9, column=1, pady=2)
 
-# Bouton Calculer
+ttk.Label(frame_form, text="Ajustement Spires BT (%) :").grid(
+    row=10, column=0, sticky="w", pady=2
+)
+entry_marge = ttk.Entry(frame_form)
+entry_marge.insert(0, "3.0")
+entry_marge.grid(row=10, column=1, pady=2)
+
 btn_calculer = tk.Button(
     root,
     text="CALCULER LE DIMENSIONNEMENT",
@@ -291,13 +301,40 @@ btn_calculer = tk.Button(
     bg="#10B981",
     fg="white",
     command=lancer_calcul,
-    pady=5,
+    pady=4,
 )
-btn_calculer.pack(fill="x", padx=15, pady=5)
+btn_calculer.pack(fill="x", padx=15, pady=4)
 
-# Zone de Résultats
-frame_res = ttk.LabelFrame(root, text=" Résultats du calcul ", padding=12)
-frame_res.pack(fill="x", padx=15, pady=8)
+# Module de conversion d'atelier
+frame_conv = ttk.LabelFrame(
+    root, text=" Module de Conversion Directe Atelier ", padding=8
+)
+frame_conv.pack(fill="x", padx=15, pady=4)
+
+ttk.Label(frame_conv, text="Ø Fil Alu (mm) :").grid(
+    row=0, column=0, sticky="w"
+)
+entry_conv_alu = ttk.Entry(frame_conv, width=12)
+entry_conv_alu.insert(0, "0.80")
+entry_conv_alu.grid(row=0, column=1, padx=5)
+
+btn_conv = tk.Button(
+    frame_conv,
+    text="Convertir en Cuivre",
+    bg="#3B82F6",
+    fg="white",
+    command=convertir_alu_cuivre,
+)
+btn_conv.grid(row=0, column=2, padx=5)
+
+lbl_res_conv = ttk.Label(
+    frame_conv, text="Ø Cuivre : -", font=("Helvetica", 9, "bold"), foreground="green"
+)
+lbl_res_conv.grid(row=1, column=0, columnspan=3, sticky="w", pady=4)
+
+# Résultats
+frame_res = ttk.LabelFrame(root, text=" Résultats du calcul ", padding=8)
+frame_res.pack(fill="x", padx=15, pady=4)
 
 labels = [
     ("Section Nette Fer (Sfer) :", "lbl_sfer"),
@@ -314,12 +351,12 @@ labels = [
 
 for i, (text, var_name) in enumerate(labels):
     ttk.Label(frame_res, text=text, font=("Helvetica", 9, "bold")).grid(
-        row=i, column=0, sticky="w", pady=2
+        row=i, column=0, sticky="w", pady=1
     )
     lbl = ttk.Label(
         frame_res, text="-", font=("Helvetica", 9), foreground="blue"
     )
-    lbl.grid(row=i, column=1, sticky="w", padx=10, pady=2)
+    lbl.grid(row=i, column=1, sticky="w", padx=10, pady=1)
     globals()[var_name] = lbl
 
 root.mainloop()
