@@ -1,6 +1,18 @@
 import math
+import os
+import sys
 import tkinter as tk
 from tkinter import messagebox, ttk
+
+
+# Fonction pour gérer les chemins d'accès aux fichiers en mode .exe
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 
 # --- PROFILS CONSTRUCTEURS ENRICHIS ---
 PROFILS_CONSTRUCTEURS = {
@@ -158,23 +170,33 @@ def lancer_calcul():
 # --- FENÊTRE PRINCIPALE ---
 root = tk.Tk()
 root.title("Calculateur de Rebobinage Transformateur - Atelier HTA")
-root.geometry("540x780")
+root.geometry("540x820")
 root.resizable(False, False)
 
 style = ttk.Style()
 style.theme_use("clam")
 
-# Entête
+# --- EN-TÊTE AVEC IMAGE ET TITRE ---
 frame_header = tk.Frame(root, bg="#1E3A8A", pady=10)
 frame_header.pack(fill="x")
+
+# Chargement de l'image (si présente dans le dossier)
+image_path = resource_path("transfo.png")
+if os.path.exists(image_path):
+    img_icon = tk.PhotoImage(file=image_path)
+    # Redimensionnement si nécessaire (sous-échantillonnage)
+    img_icon_small = img_icon.subsample(4, 4)
+    lbl_img = tk.Label(frame_header, image=img_icon_small, bg="#1E3A8A")
+    lbl_img.pack(side="left", padx=15)
+
 lbl_title = tk.Label(
     frame_header,
     text="DIMENSIONNEMENT TRANSFO HTA/BT",
-    font=("Helvetica", 14, "bold"),
+    font=("Helvetica", 13, "bold"),
     fg="white",
     bg="#1E3A8A",
 )
-lbl_title.pack()
+lbl_title.pack(side="left", padx=5)
 
 # Formulaire
 frame_form = ttk.LabelFrame(root, text=" Données d'entrée ", padding=12)
