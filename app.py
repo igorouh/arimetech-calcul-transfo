@@ -1,19 +1,6 @@
 import math
-import os
-import sys
-import tkinter as tk
-from tkinter import messagebox, ttk
+import flet as ft
 
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-
-# --- PROFILS CONSTRUCTEURS ENRICHIS ---
 PROFILS_CONSTRUCTEURS = {
     "ABB / Standard": {
         "B_tesla": 1.64,
@@ -82,317 +69,205 @@ def calculer_section_fer(largeur_cm, nb_toles, epaisseur_tole_mm, nb_etages):
 
 
 def estimer_meplat(section_mm2):
-    if section_mm2 <= 15:
-        ep = 2.0
-    elif section_mm2 <= 40:
-        ep = 3.0
-    elif section_mm2 <= 80:
-        ep = 4.0
-    else:
-        ep = 5.0
+    ep = (
+        2.0
+        if section_mm2 <= 15
+        else (3.0 if section_mm2 <= 40 else (4.0 if section_mm2 <= 80 else 5.0))
+    )
     return ep, section_mm2 / ep
 
 
-def changer_constructeur(event):
-    constructeur = combo_constructeur.get()
-    profil = PROFILS_CONSTRUCTEURS.get(
-        constructeur, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
+def main(page: ft.Page):
+    page.title = "Calculateur Transfo HTA/BT"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.scroll = ft.ScrollMode.AUTO
+
+    # Champs du formulaire
+    skva = ft.TextField(label="Puissance (kVA)", value="50")
+    u1 = ft.TextField(label="Tension HT (V)", value="33000")
+    u2 = ft.TextField(label="Tension BT (V)", value="400")
+    largeur = ft.TextField(label="Largeur tôle (cm)", value="10.0")
+    toles = ft.TextField(label="Nombre de tôles", value="318")
+    epaisseur = ft.TextField(label="Épaisseur tôle (mm)", value="0.30")
+
+    etages = ft.Dropdown(
+        label="Nombre d'étages",
+        value="3",
+        options=[ft.dropdown.Option(x) for x in ["3", "5", "7"]],
     )
-    marge_defaut = profil.get("marge_spires", 3.0)
-
-    entry_marge.delete(0, tk.END)
-    entry_marge.insert(0, str(marge_defaut))
-
-
-def convertir_alu_cuivre():
-    try:
-        d_alu = float(entry_conv_alu.get())
-        d_cu = d_alu * 0.78
-        sec_alu = math.pi * ((d_alu / 2) ** 2)
-        sec_cu = math.pi * ((d_cu / 2) ** 2)
-        lbl_res_conv.config(
-            text=f"Ø Cuivre : {d_cu:.2f} mm  (S_alu={sec_alu:.2f}mm² → S_cu={sec_cu:.2f}mm²)"
-        )
-    except ValueError:
-        messagebox.showerror(
-            "Erreur", "Veuillez entrer un diamètre valide en mm."
-        )
-
-
-def lancer_calcul():
-    try:
-        s_kva = float(entry_skva.get())
-        u1_volts = float(entry_u1.get())
-        u2_volts = float(entry_u2.get())
-        largeur_cm = float(entry_largeur.get())
-        nb_toles = int(entry_toles.get())
-        epaisseur_mm = float(entry_epaisseur.get())
-        nb_etages = int(combo_etages.get())
-        mat_prim = combo_mat_ht.get()
-        mat_sec = combo_mat_bt.get()
-        constructeur = combo_constructeur.get()
-
-        profil = PROFILS_CONSTRUCTEURS.get(
-            constructeur, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
-        )
-        b_tesla = profil["B_tesla"]
-
-        j_prim = (
-            profil["J_alu_ht"]
-            if mat_prim.lower() == "aluminium"
-            else profil["J_cu_ht"]
-        )
-        j_sec = (
-            profil["J_alu_bt"]
-            if mat_sec.lower() == "aluminium"
-            else profil["J_cu_bt"]
-        )
-
-        i1_phase = (s_kva * 1000) / (3 * u1_volts)
-        i2_phase = (s_kva * 1000) / (math.sqrt(3) * u2_volts)
-        v2_phase = u2_volts / math.sqrt(3)
-
-        s_fer_cm2 = calculer_section_fer(
-            largeur_cm, nb_toles, epaisseur_mm, nb_etages
-        )
-        s_fer_m2 = s_fer_cm2 / 10000.0
-
-        e_t = 4.44 * 50 * b_tesla * s_fer_m2
-        n2_theorique = v2_phase / e_t
-
-        spires_bt_saisies = entry_spires_bt_saisie.get().strip()
-
-        if spires_bt_saisies != "":
-            n2 = int(spires_bt_saisies)
-            marge_calculee = ((n2 / n2_theorique) - 1) * 100
-            entry_marge.delete(0, tk.END)
-            entry_marge.insert(0, f"{marge_calculee:.1f}")
-            info_bt = f"{n2} spires (Relevé atelier)"
-        else:
-            marge_spires = float(entry_marge.get()) / 100.0
-            n2 = round(n2_theorique * (1 + marge_spires))
-            info_bt = f"{n2} spires (Calculé)"
-
-        n1 = round(n2 * (u1_volts / v2_phase))
-
-        sec_ht_mm2 = i1_phase / j_prim
-        diam_ht_mm = 2 * math.sqrt(sec_ht_mm2 / math.pi)
-
-        sec_bt_mm2 = i2_phase / j_sec
-        diam_bt_mm = 2 * math.sqrt(sec_bt_mm2 / math.pi)
-        ep_mep, larg_mep = estimer_meplat(sec_bt_mm2)
-
-        lbl_sfer.config(text=f"{s_fer_cm2:.2f} cm²")
-        lbl_et.config(text=f"{e_t:.3f} V/spire")
-        lbl_n2.config(text=info_bt)
-        lbl_n1.config(text=f"{n1} spires")
-        lbl_i1.config(text=f"{i1_phase:.3f} A")
-        lbl_i2.config(text=f"{i2_phase:.2f} A")
-
-        lbl_sec_ht.config(text=f"{sec_ht_mm2:.3f} mm² (Ø {diam_ht_mm:.2f} mm)")
-        lbl_sec_bt.config(text=f"{sec_bt_mm2:.2f} mm²")
-        lbl_diam_bt.config(text=f"Ø {diam_bt_mm:.2f} mm")
-        lbl_meplat_bt.config(
-            text=f"{ep_mep:.1f} mm x {larg_mep:.2f} mm (Ép. x Larg.)"
-        )
-
-    except ValueError:
-        messagebox.showerror(
-            "Erreur de saisie",
-            "Veuillez vérifier vos données ! Les valeurs doivent être numériques.",
-        )
-
-
-root = tk.Tk()
-root.title("Calculateur de Rebobinage Transformateur - Atelier HTA")
-root.geometry("560x930")
-root.resizable(False, False)
-
-style = ttk.Style()
-style.theme_use("clam")
-
-# En-tête
-frame_header = tk.Frame(root, bg="#1E3A8A", pady=10)
-frame_header.pack(fill="x")
-
-image_path = resource_path("transfo.png")
-if os.path.exists(image_path):
-    img_icon = tk.PhotoImage(file=image_path)
-    img_icon_small = img_icon.subsample(4, 4)
-    lbl_img = tk.Label(frame_header, image=img_icon_small, bg="#1E3A8A")
-    lbl_img.pack(side="left", padx=15)
-
-lbl_title = tk.Label(
-    frame_header,
-    text="DIMENSIONNEMENT TRANSFO HTA/BT",
-    font=("Helvetica", 13, "bold"),
-    fg="white",
-    bg="#1E3A8A",
-)
-lbl_title.pack(side="left", padx=5)
-
-# Formulaire
-frame_form = ttk.LabelFrame(root, text=" Données d'entrée ", padding=10)
-frame_form.pack(fill="x", padx=15, pady=5)
-
-ttk.Label(frame_form, text="Puissance (kVA) :").grid(
-    row=0, column=0, sticky="w", pady=2
-)
-entry_skva = ttk.Entry(frame_form)
-entry_skva.insert(0, "50")
-entry_skva.grid(row=0, column=1, pady=2)
-
-ttk.Label(frame_form, text="Tension HT (Volts) :").grid(
-    row=1, column=0, sticky="w", pady=2
-)
-entry_u1 = ttk.Entry(frame_form)
-entry_u1.insert(0, "33000")
-entry_u1.grid(row=1, column=1, pady=2)
-
-ttk.Label(frame_form, text="Tension BT (Volts) :").grid(
-    row=2, column=0, sticky="w", pady=2
-)
-entry_u2 = ttk.Entry(frame_form)
-entry_u2.insert(0, "400")
-entry_u2.grid(row=2, column=1, pady=2)
-
-ttk.Label(frame_form, text="Largeur tôle (cm) :").grid(
-    row=3, column=0, sticky="w", pady=2
-)
-entry_largeur = ttk.Entry(frame_form)
-entry_largeur.insert(0, "10.0")
-entry_largeur.grid(row=3, column=1, pady=2)
-
-ttk.Label(frame_form, text="Nombre de tôles :").grid(
-    row=4, column=0, sticky="w", pady=2
-)
-entry_toles = ttk.Entry(frame_form)
-entry_toles.insert(0, "318")
-entry_toles.grid(row=4, column=1, pady=2)
-
-ttk.Label(frame_form, text="Épaisseur tôle (mm) :").grid(
-    row=5, column=0, sticky="w", pady=2
-)
-entry_epaisseur = ttk.Entry(frame_form)
-entry_epaisseur.insert(0, "0.30")
-entry_epaisseur.grid(row=5, column=1, pady=2)
-
-ttk.Label(frame_form, text="Nombre d'étages :").grid(
-    row=6, column=0, sticky="w", pady=2
-)
-combo_etages = ttk.Combobox(
-    frame_form, values=["3", "5", "7"], state="readonly", width=17
-)
-combo_etages.current(0)
-combo_etages.grid(row=6, column=1, pady=2)
-
-ttk.Label(frame_form, text="Matériau HT (Primaire) :").grid(
-    row=7, column=0, sticky="w", pady=2
-)
-combo_mat_ht = ttk.Combobox(
-    frame_form, values=["Aluminium", "Cuivre"], state="readonly", width=17
-)
-combo_mat_ht.current(0)
-combo_mat_ht.grid(row=7, column=1, pady=2)
-
-ttk.Label(frame_form, text="Matériau BT (Secondaire) :").grid(
-    row=8, column=0, sticky="w", pady=2
-)
-combo_mat_bt = ttk.Combobox(
-    frame_form, values=["Aluminium", "Cuivre"], state="readonly", width=17
-)
-combo_mat_bt.current(0)
-combo_mat_bt.grid(row=8, column=1, pady=2)
-
-ttk.Label(frame_form, text="Constructeur :").grid(
-    row=9, column=0, sticky="w", pady=2
-)
-combo_constructeur = ttk.Combobox(
-    frame_form,
-    values=list(PROFILS_CONSTRUCTEURS.keys()),
-    state="readonly",
-    width=17,
-)
-combo_constructeur.current(0)
-combo_constructeur.grid(row=9, column=1, pady=2)
-combo_constructeur.bind("<<ComboboxSelected>>", changer_constructeur)
-
-ttk.Label(frame_form, text="Ajustement Spires BT (%) :").grid(
-    row=10, column=0, sticky="w", pady=2
-)
-entry_marge = ttk.Entry(frame_form)
-entry_marge.insert(0, "2.5")
-entry_marge.grid(row=10, column=1, pady=2)
-
-ttk.Label(
-    frame_form, text="Spires BT relevées (Optionnel) :", font=("Helvetica", 9, "bold")
-).grid(row=11, column=0, sticky="w", pady=2)
-entry_spires_bt_saisie = ttk.Entry(frame_form)
-entry_spires_bt_saisie.grid(row=11, column=1, pady=2)
-
-btn_calculer = tk.Button(
-    root,
-    text="CALCULER LE DIMENSIONNEMENT",
-    font=("Helvetica", 10, "bold"),
-    bg="#10B981",
-    fg="white",
-    command=lancer_calcul,
-    pady=4,
-)
-btn_calculer.pack(fill="x", padx=15, pady=4)
-
-# Module de conversion d'atelier
-frame_conv = ttk.LabelFrame(
-    root, text=" Module de Conversion Directe Atelier ", padding=8
-)
-frame_conv.pack(fill="x", padx=15, pady=4)
-
-ttk.Label(frame_conv, text="Ø Fil Alu (mm) :").grid(
-    row=0, column=0, sticky="w"
-)
-entry_conv_alu = ttk.Entry(frame_conv, width=12)
-entry_conv_alu.insert(0, "0.80")
-entry_conv_alu.grid(row=0, column=1, padx=5)
-
-btn_conv = tk.Button(
-    frame_conv,
-    text="Convertir en Cuivre",
-    bg="#3B82F6",
-    fg="white",
-    command=convertir_alu_cuivre,
-)
-btn_conv.grid(row=0, column=2, padx=5)
-
-lbl_res_conv = ttk.Label(
-    frame_conv, text="Ø Cuivre : -", font=("Helvetica", 9, "bold"), foreground="green"
-)
-lbl_res_conv.grid(row=1, column=0, columnspan=3, sticky="w", pady=4)
-
-# Résultats
-frame_res = ttk.LabelFrame(root, text=" Résultats du calcul ", padding=8)
-frame_res.pack(fill="x", padx=15, pady=4)
-
-labels = [
-    ("Section Nette Fer (Sfer) :", "lbl_sfer"),
-    ("Tension par spire :", "lbl_et"),
-    ("Spires BT (N2) :", "lbl_n2"),
-    ("Spires HT (N1) :", "lbl_n1"),
-    ("Courant Phase HT (I1ph) :", "lbl_i1"),
-    ("Courant Phase BT (I2ph) :", "lbl_i2"),
-    ("Conducteur HT (Primaire) :", "lbl_sec_ht"),
-    ("Section Conducteur BT :", "lbl_sec_bt"),
-    (" - Si Fil Rond BT :", "lbl_diam_bt"),
-    (" - Si Méplat BT (suggéré) :", "lbl_meplat_bt"),
-]
-
-for i, (text, var_name) in enumerate(labels):
-    ttk.Label(frame_res, text=text, font=("Helvetica", 9, "bold")).grid(
-        row=i, column=0, sticky="w", pady=1
+    mat_ht = ft.Dropdown(
+        label="Matériau HT",
+        value="Aluminium",
+        options=[
+            ft.dropdown.Option("Aluminium"),
+            ft.dropdown.Option("Cuivre"),
+        ],
     )
-    lbl = ttk.Label(
-        frame_res, text="-", font=("Helvetica", 9), foreground="blue"
+    mat_bt = ft.Dropdown(
+        label="Matériau BT",
+        value="Aluminium",
+        options=[
+            ft.dropdown.Option("Aluminium"),
+            ft.dropdown.Option("Cuivre"),
+        ],
     )
-    lbl.grid(row=i, column=1, sticky="w", padx=10, pady=1)
-    globals()[var_name] = lbl
 
-root.mainloop()
+    marge = ft.TextField(label="Ajustement Spires BT (%)", value="2.5")
+    spires_bt_rec = ft.TextField(label="Spires BT relevées (Optionnel)")
+
+    def changer_constructeur(e):
+        p = PROFILS_CONSTRUCTEURS.get(
+            constructeur.value, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
+        )
+        marge.value = str(p.get("marge_spires", 3.0))
+        page.update()
+
+    constructeur = ft.Dropdown(
+        label="Constructeur",
+        value="ABB / Standard",
+        options=[ft.dropdown.Option(k) for k in PROFILS_CONSTRUCTEURS.keys()],
+        on_change=changer_constructeur,
+    )
+
+    # Conversion rapide
+    conv_alu = ft.TextField(label="Ø Fil Alu (mm)", value="0.80", width=150)
+    res_conv = ft.Text("Ø Cuivre : -", color="blue", weight=ft.FontWeight.BOLD)
+
+    def executer_conversion(e):
+        try:
+            d_alu = float(conv_alu.value)
+            d_cu = d_alu * 0.78
+            sec_alu = math.pi * ((d_alu / 2) ** 2)
+            sec_cu = math.pi * ((d_cu / 2) ** 2)
+            res_conv.value = (
+                f"Ø Cuivre : {d_cu:.2f} mm (S_alu={sec_alu:.2f}mm² →"
+                f" S_cu={sec_cu:.2f}mm²)"
+            )
+        except ValueError:
+            res_conv.value = "Erreur de saisie"
+        page.update()
+
+    # Zone d'affichage des résultats
+    res_text = ft.Text("Entrez les données et cliquez sur Calculer.", size=14)
+
+    def executer_calcul(e):
+        try:
+            p_skva = float(skva.value)
+            p_u1 = float(u1.value)
+            p_u2 = float(u2.value)
+            p_larg = float(largeur.value)
+            p_toles = int(toles.value)
+            p_ep = float(epaisseur.value)
+            p_etages = int(etages.value)
+
+            profil = PROFILS_CONSTRUCTEURS.get(
+                constructeur.value,
+                PROFILS_CONSTRUCTEURS["Générique / Inconnu"],
+            )
+            b_tesla = profil["B_tesla"]
+
+            j_prim = (
+                profil["J_alu_ht"]
+                if mat_ht.value.lower() == "aluminium"
+                else profil["J_cu_ht"]
+            )
+            j_sec = (
+                profil["J_alu_bt"]
+                if mat_bt.value.lower() == "aluminium"
+                else profil["J_cu_bt"]
+            )
+
+            i1_ph = (p_skva * 1000) / (3 * p_u1)
+            i2_ph = (p_skva * 1000) / (math.sqrt(3) * p_u2)
+            v2_ph = p_u2 / math.sqrt(3)
+
+            s_fer_cm2 = calculer_section_fer(p_larg, p_toles, p_ep, p_etages)
+            s_fer_m2 = s_fer_cm2 / 10000.0
+            e_t = 4.44 * 50 * b_tesla * s_fer_m2
+            n2_theo = v2_ph / e_t
+
+            if spires_bt_rec.value.strip():
+                n2 = int(spires_bt_rec.value.strip())
+                marge.value = f"{((n2 / n2_theo) - 1) * 100:.1f}"
+                info_bt = f"{n2} spires (Relevé)"
+            else:
+                marge_val = float(marge.value) / 100.0
+                n2 = round(n2_theo * (1 + marge_val))
+                info_bt = f"{n2} spires (Calculé)"
+
+            n1 = round(n2 * (p_u1 / v2_ph))
+
+            sec_ht = i1_ph / j_prim
+            diam_ht = 2 * math.sqrt(sec_ht / math.pi)
+
+            sec_bt = i2_ph / j_sec
+            diam_bt = 2 * math.sqrt(sec_bt / math.pi)
+            ep_mep, larg_mep = estimer_meplat(sec_bt)
+
+            res_text.value = (
+                f"Section Fer (Sfer) : {s_fer_cm2:.2f} cm²\n"
+                f"Tension par spire (Et) : {e_t:.3f} V/spire\n"
+                f"Spires BT (N2) : {info_bt}\n"
+                f"Spires HT (N1) : {n1} spires\n"
+                f"Courant HT (I1ph) : {i1_ph:.3f} A\n"
+                f"Courant BT (I2ph) : {i2_ph:.2f} A\n"
+                f"Conducteur HT : {sec_ht:.3f} mm² (Ø {diam_ht:.2f} mm)\n"
+                f"Section BT : {sec_bt:.2f} mm² (Ø {diam_bt:.2f} mm)\n"
+                f"Méplat BT : {ep_mep:.1f} x {larg_mep:.2f} mm"
+            )
+        except Exception as ex:
+            res_text.value = f"Erreur de calcul : {ex}"
+        page.update()
+
+    page.add(
+        ft.AppBar(
+            title=ft.Text("DIMENSIONNEMENT TRANSFO HTA/BT"),
+            bg_color="#1E3A8A",
+            color="white",
+        ),
+        ft.Container(
+            padding=15,
+            content=ft.Column(
+                [
+                    skva,
+                    u1,
+                    u2,
+                    largeur,
+                    toles,
+                    epaisseur,
+                    etages,
+                    mat_ht,
+                    mat_bt,
+                    constructeur,
+                    marge,
+                    spires_bt_rec,
+                    ft.ElevatedButton(
+                        "CALCULER LE DIMENSIONNEMENT",
+                        on_click=executer_calcul,
+                        style=ft.ButtonStyle(
+                            bg_color="#10B981", color="white"
+                        ),
+                    ),
+                    ft.Divider(),
+                    ft.Text(
+                        "Conversion Directe Atelier", weight=ft.FontWeight.BOLD
+                    ),
+                    ft.Row(
+                        [
+                            conv_alu,
+                            ft.ElevatedButton(
+                                "Convertir", on_click=executer_conversion
+                            ),
+                        ]
+                    ),
+                    res_conv,
+                    ft.Divider(),
+                    ft.Card(content=ft.Container(content=res_text, padding=15)),
+                ]
+            ),
+        ),
+    )
+
+
+if __name__ == "__main__":
+    ft.app(target=main)
