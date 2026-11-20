@@ -3,95 +3,92 @@ import flet as ft
 
 PROFILS_CONSTRUCTEURS = {
     "ABB / Standard": {
-        "B_tesla": 1.64,
-        "J_alu_ht": 1.0,
-        "J_cu_ht": 2.5,
-        "J_alu_bt": 2.5,
-        "J_cu_bt": 3.0,
+        "B_tesla": 1.65,
+        "J_alu_ht": 1.30,
+        "J_cu_ht": 3.15,
+        "J_alu_bt": 2.50,
+        "J_cu_bt": 3.20,
         "marge_spires": 0.0,
     },
     "Cahors / Transfix": {
         "B_tesla": 1.65,
-        "J_alu_ht": 1.05,
-        "J_cu_ht": 2.6,
-        "J_alu_bt": 2.5,
-        "J_cu_bt": 3.1,
+        "J_alu_ht": 1.35,
+        "J_cu_ht": 3.20,
+        "J_alu_bt": 2.55,
+        "J_cu_bt": 3.25,
         "marge_spires": 0.0,
     },
     "Schneider / France Transfo": {
-        "B_tesla": 1.62,
-        "J_alu_ht": 1.1,
-        "J_cu_ht": 2.7,
-        "J_alu_bt": 2.5,
-        "J_cu_bt": 3.2,
-        "marge_spires": 1.0,
+        "B_tesla": 1.64,
+        "J_alu_ht": 1.35,
+        "J_cu_ht": 3.20,
+        "J_alu_bt": 2.55,
+        "J_cu_bt": 3.30,
+        "marge_spires": 0.0,
     },
     "Siemens": {
         "B_tesla": 1.65,
-        "J_alu_ht": 1.0,
-        "J_cu_ht": 2.6,
-        "J_alu_bt": 2.5,
-        "J_cu_bt": 3.0,
+        "J_alu_ht": 1.30,
+        "J_cu_ht": 3.15,
+        "J_alu_bt": 2.50,
+        "J_cu_bt": 3.20,
         "marge_spires": 0.0,
     },
     "SACEM": {
-        "B_tesla": 1.60,
-        "J_alu_ht": 1.05,
-        "J_cu_ht": 2.55,
+        "B_tesla": 1.62,
+        "J_alu_ht": 1.25,
+        "J_cu_ht": 3.00,
         "J_alu_bt": 2.45,
-        "J_cu_bt": 2.9,
-        "marge_spires": 1.5,
+        "J_cu_bt": 3.00,
+        "marge_spires": 0.0,
     },
     "Nexans": {
-        "B_tesla": 1.63,
-        "J_alu_ht": 1.1,
-        "J_cu_ht": 2.65,
-        "J_alu_bt": 2.5,
-        "J_cu_bt": 3.1,
-        "marge_spires": 1.0,
+        "B_tesla": 1.64,
+        "J_alu_ht": 1.30,
+        "J_cu_ht": 3.15,
+        "J_alu_bt": 2.50,
+        "J_cu_bt": 3.20,
+        "marge_spires": 0.0,
     },
     "Energie Transfo": {
-        "B_tesla": 1.61,
-        "J_alu_ht": 1.0,
-        "J_cu_ht": 2.5,
-        "J_alu_bt": 2.4,
-        "J_cu_bt": 2.85,
-        "marge_spires": 2.0,
+        "B_tesla": 1.62,
+        "J_alu_ht": 1.25,
+        "J_cu_ht": 3.00,
+        "J_alu_bt": 2.40,
+        "J_cu_bt": 2.95,
+        "marge_spires": 0.0,
     },
     "Générique / Inconnu": {
-        "B_tesla": 1.60,
-        "J_alu_ht": 1.0,
-        "J_cu_ht": 2.5,
-        "J_alu_bt": 2.4,
-        "J_cu_bt": 2.8,
-        "marge_spires": 1.0,
+        "B_tesla": 1.62,
+        "J_alu_ht": 1.30,
+        "J_cu_ht": 3.10,
+        "J_alu_bt": 2.45,
+        "J_cu_bt": 3.10,
+        "marge_spires": 0.0,
     },
 }
 
 
 def calculer_section_fer(largeur_cm, nb_toles, epaisseur_tole_mm, nb_etages):
-    # Empilage total en cm
     epaisseur_totale_cm = (nb_toles * epaisseur_tole_mm) / 10.0
 
-    # Facteur de remplissage géométrique d'un noyau étagé inscrit dans le cercle
-    # (rapport entre l'aire réelle des gradins et le rectangle L x E)
+    # Facteur de remplissage géométrique réel des noyaux étagés
     if nb_etages <= 3:
-        k_gradins = 0.72
+        k_gradins = 0.74
     elif nb_etages <= 5:
-        k_gradins = 0.76
+        k_gradins = 0.78
     elif nb_etages <= 7:
-        k_gradins = 0.79
+        k_gradins = 0.81
     elif nb_etages <= 9:
-        k_gradins = 0.805
-    elif nb_etages <= 11:
-        k_gradins = 0.815
-    elif nb_etages <= 13:
         k_gradins = 0.825
-    else:  # 15 étages et plus
+    elif nb_etages <= 11:
         k_gradins = 0.835
+    elif nb_etages <= 13:
+        k_gradins = 0.845
+    else:
+        k_gradins = 0.855
 
     section_brute_etagee = largeur_cm * epaisseur_totale_cm * k_gradins
-    # Application du facteur d'isolation inter-tôles (foisonnement = 0.95)
     return section_brute_etagee * 0.95
 
 
@@ -109,10 +106,9 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.scroll = ft.ScrollMode.AUTO
 
-    # Champs du formulaire (pré-remplis avec votre cas 160 kVA pour vérification)
     skva = ft.TextField(label="Puissance (kVA)", value="160")
     u1 = ft.TextField(label="Tension HT (V)", value="33000")
-    u2 = ft.TextField(label="Tension BT (V)", value="400")
+    u2 = ft.TextField(label="Tension BT à vide (V)", value="400")
     largeur = ft.TextField(
         label="Diamètre noyau / Largeur tôle principale (cm)", value="13.5"
     )
@@ -127,7 +123,7 @@ def main(page: ft.Page):
 
     mat_ht = ft.Dropdown(
         label="Matériau HT",
-        value="Aluminium",
+        value="Cuivre",
         options=[
             ft.dropdown.Option("Aluminium"),
             ft.dropdown.Option("Cuivre"),
@@ -135,7 +131,7 @@ def main(page: ft.Page):
     )
     mat_bt = ft.Dropdown(
         label="Matériau BT",
-        value="Aluminium",
+        value="Cuivre",
         options=[
             ft.dropdown.Option("Aluminium"),
             ft.dropdown.Option("Cuivre"),
@@ -159,7 +155,6 @@ def main(page: ft.Page):
         on_select=changer_constructeur,
     )
 
-    # Conversion rapide
     conv_alu = ft.TextField(label="Ø Fil Alu (mm)", value="0.80", width=150)
     res_conv = ft.Text("Ø Cuivre : -", color="blue", weight=ft.FontWeight.BOLD)
 
@@ -177,7 +172,6 @@ def main(page: ft.Page):
             res_conv.value = "Erreur de saisie"
         page.update()
 
-    # Zone d'affichage des résultats
     res_text = ft.Text("Entrez les données et cliquez sur Calculer.", size=14)
 
     def executer_calcul(e):
@@ -186,13 +180,11 @@ def main(page: ft.Page):
             p_u1 = float(u1.value)
             p_u2 = float(u2.value)
             p_larg = float(largeur.value)
-            # Conversion automatique si l'utilisateur saisit le diamètre en mm (ex: 135 au lieu de 13.5)
             if p_larg > 50:
                 p_larg = p_larg / 10.0
 
             p_toles = int(toles.value)
             p_ep = float(epaisseur.value)
-            # Conversion automatique si l'utilisateur saisit l'épaisseur en centièmes (ex: 30 au lieu de 0.30)
             if p_ep > 2:
                 p_ep = p_ep / 100.0
 
@@ -233,7 +225,7 @@ def main(page: ft.Page):
                 n2 = round(n2_theo * (1 + marge_val))
                 info_bt = f"{n2} spires (Calculé)"
 
-            n1 = round(n2 * (p_u1 / v2_ph))
+            n1 = round(p_u1 / (v2_ph / n2))
 
             sec_ht = i1_ph / j_prim
             diam_ht = 2 * math.sqrt(sec_ht / math.pi)
