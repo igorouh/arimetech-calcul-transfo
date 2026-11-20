@@ -10,6 +10,14 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_bt": 3.0,
         "marge_spires": 2.5,
     },
+    "Cahors / Transfix": {
+        "B_tesla": 1.65,
+        "J_alu_ht": 1.05,
+        "J_cu_ht": 2.6,
+        "J_alu_bt": 2.5,
+        "J_cu_bt": 3.1,
+        "marge_spires": 2.5,
+    },
     "Schneider / France Transfo": {
         "B_tesla": 1.62,
         "J_alu_ht": 1.1,
@@ -64,7 +72,23 @@ PROFILS_CONSTRUCTEURS = {
 def calculer_section_fer(largeur_cm, nb_toles, epaisseur_tole_mm, nb_etages):
     epaisseur_totale_cm = (nb_toles * epaisseur_tole_mm) / 10.0
     section_brute = largeur_cm * epaisseur_totale_cm
-    k_forme = 0.83 if nb_etages <= 3 else (0.88 if nb_etages <= 5 else 0.91)
+
+    # Facteur de forme géométrique adaptatif selon le nombre d'étages saisi
+    if nb_etages <= 3:
+        k_forme = 0.83
+    elif nb_etages <= 5:
+        k_forme = 0.88
+    elif nb_etages <= 7:
+        k_forme = 0.91
+    elif nb_etages <= 9:
+        k_forme = 0.925
+    elif nb_etages <= 11:
+        k_forme = 0.935
+    elif nb_etages <= 13:
+        k_forme = 0.945
+    else:  # 15 étages et plus
+        k_forme = 0.955
+
     return section_brute * k_forme * 0.95
 
 
@@ -86,15 +110,17 @@ def main(page: ft.Page):
     skva = ft.TextField(label="Puissance (kVA)", value="50")
     u1 = ft.TextField(label="Tension HT (V)", value="33000")
     u2 = ft.TextField(label="Tension BT (V)", value="400")
-    largeur = ft.TextField(label="Largeur tôle (cm)", value="10.0")
-    toles = ft.TextField(label="Nombre de tôles", value="318")
+    largeur = ft.TextField(label="Largeur tôle principale (cm)", value="10.0")
+    toles = ft.TextField(label="Nombre de tôles total", value="318")
     epaisseur = ft.TextField(label="Épaisseur tôle (mm)", value="0.30")
 
-    etages = ft.Dropdown(
-        label="Nombre d'étages",
-        value="3",
-        options=[ft.dropdown.Option(x) for x in ["3", "5", "7"]],
+    # Champ de saisie libre pour le nombre d'étages
+    etages = ft.TextField(
+        label="Nombre d'étages (saisie libre)",
+        value="13",
+        keyboard_type=ft.KeyboardType.NUMBER,
     )
+
     mat_ht = ft.Dropdown(
         label="Matériau HT",
         value="Aluminium",
@@ -124,7 +150,7 @@ def main(page: ft.Page):
 
     constructeur = ft.Dropdown(
         label="Constructeur",
-        value="ABB / Standard",
+        value="Cahors / Transfix",
         options=[ft.dropdown.Option(k) for k in PROFILS_CONSTRUCTEURS.keys()],
         on_change=changer_constructeur,
     )
@@ -205,7 +231,7 @@ def main(page: ft.Page):
             ep_mep, larg_mep = estimer_meplat(sec_bt)
 
             res_text.value = (
-                f"Section Fer (Sfer) : {s_fer_cm2:.2f} cm²\n"
+                f"Section Fer (Sfer) : {s_fer_cm2:.2f} cm² ({p_etages} étages)\n"
                 f"Tension par spire (Et) : {e_t:.3f} V/spire\n"
                 f"Spires BT (N2) : {info_bt}\n"
                 f"Spires HT (N1) : {n1} spires\n"
@@ -216,7 +242,7 @@ def main(page: ft.Page):
                 f"Méplat BT : {ep_mep:.1f} x {larg_mep:.2f} mm"
             )
         except Exception as ex:
-            res_text.value = f"Erreur de calcul : {ex}"
+            res_text.value = f"Erreur de saisie : Vérifiez les chiffres ({ex})"
         page.update()
 
     page.add(
@@ -270,4 +296,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)
