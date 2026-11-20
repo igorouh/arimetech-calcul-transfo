@@ -8,7 +8,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.5,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.0,
-        "marge_spires": 2.5,
+        "marge_spires": 0.0,
     },
     "Cahors / Transfix": {
         "B_tesla": 1.65,
@@ -16,7 +16,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.6,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.1,
-        "marge_spires": 2.5,
+        "marge_spires": 0.0,
     },
     "Schneider / France Transfo": {
         "B_tesla": 1.62,
@@ -24,7 +24,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.7,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.2,
-        "marge_spires": 3.0,
+        "marge_spires": 1.0,
     },
     "Siemens": {
         "B_tesla": 1.65,
@@ -32,7 +32,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.6,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.0,
-        "marge_spires": 2.5,
+        "marge_spires": 0.0,
     },
     "SACEM": {
         "B_tesla": 1.60,
@@ -40,7 +40,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.55,
         "J_alu_bt": 2.45,
         "J_cu_bt": 2.9,
-        "marge_spires": 3.5,
+        "marge_spires": 1.5,
     },
     "Nexans": {
         "B_tesla": 1.63,
@@ -48,7 +48,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.65,
         "J_alu_bt": 2.5,
         "J_cu_bt": 3.1,
-        "marge_spires": 3.0,
+        "marge_spires": 1.0,
     },
     "Energie Transfo": {
         "B_tesla": 1.61,
@@ -56,7 +56,7 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.5,
         "J_alu_bt": 2.4,
         "J_cu_bt": 2.85,
-        "marge_spires": 4.0,
+        "marge_spires": 2.0,
     },
     "Générique / Inconnu": {
         "B_tesla": 1.60,
@@ -64,32 +64,35 @@ PROFILS_CONSTRUCTEURS = {
         "J_cu_ht": 2.5,
         "J_alu_bt": 2.4,
         "J_cu_bt": 2.8,
-        "marge_spires": 3.0,
+        "marge_spires": 1.0,
     },
 }
 
 
 def calculer_section_fer(largeur_cm, nb_toles, epaisseur_tole_mm, nb_etages):
+    # Empilage total en cm
     epaisseur_totale_cm = (nb_toles * epaisseur_tole_mm) / 10.0
-    section_brute = largeur_cm * epaisseur_totale_cm
 
-    # Facteur de forme géométrique adaptatif selon le nombre d'étages saisi
+    # Facteur de remplissage géométrique d'un noyau étagé inscrit dans le cercle
+    # (rapport entre l'aire réelle des gradins et le rectangle L x E)
     if nb_etages <= 3:
-        k_forme = 0.83
+        k_gradins = 0.72
     elif nb_etages <= 5:
-        k_forme = 0.88
+        k_gradins = 0.76
     elif nb_etages <= 7:
-        k_forme = 0.91
+        k_gradins = 0.79
     elif nb_etages <= 9:
-        k_forme = 0.925
+        k_gradins = 0.805
     elif nb_etages <= 11:
-        k_forme = 0.935
+        k_gradins = 0.815
     elif nb_etages <= 13:
-        k_forme = 0.945
+        k_gradins = 0.825
     else:  # 15 étages et plus
-        k_forme = 0.955
+        k_gradins = 0.835
 
-    return section_brute * k_forme * 0.95
+    section_brute_etagee = largeur_cm * epaisseur_totale_cm * k_gradins
+    # Application du facteur d'isolation inter-tôles (foisonnement = 0.95)
+    return section_brute_etagee * 0.95
 
 
 def estimer_meplat(section_mm2):
@@ -106,15 +109,16 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.scroll = ft.ScrollMode.AUTO
 
-    # Champs du formulaire
-    skva = ft.TextField(label="Puissance (kVA)", value="50")
+    # Champs du formulaire (pré-remplis avec votre cas 160 kVA pour vérification)
+    skva = ft.TextField(label="Puissance (kVA)", value="160")
     u1 = ft.TextField(label="Tension HT (V)", value="33000")
     u2 = ft.TextField(label="Tension BT (V)", value="400")
-    largeur = ft.TextField(label="Largeur tôle principale (cm)", value="10.0")
-    toles = ft.TextField(label="Nombre de tôles total", value="318")
-    epaisseur = ft.TextField(label="Épaisseur tôle (mm)", value="0.30")
+    largeur = ft.TextField(
+        label="Diamètre noyau / Largeur tôle principale (cm)", value="13.5"
+    )
+    toles = ft.TextField(label="Nombre de lames total", value="426")
+    epaisseur = ft.TextField(label="Épaisseur lame (mm)", value="0.30")
 
-    # Champ de saisie libre pour le nombre d'étages
     etages = ft.TextField(
         label="Nombre d'étages (saisie libre)",
         value="13",
@@ -138,14 +142,14 @@ def main(page: ft.Page):
         ],
     )
 
-    marge = ft.TextField(label="Ajustement Spires BT (%)", value="2.5")
+    marge = ft.TextField(label="Ajustement Spires BT (%)", value="0.0")
     spires_bt_rec = ft.TextField(label="Spires BT relevées (Optionnel)")
 
     def changer_constructeur(e):
         p = PROFILS_CONSTRUCTEURS.get(
             constructeur.value, PROFILS_CONSTRUCTEURS["Générique / Inconnu"]
         )
-        marge.value = str(p.get("marge_spires", 3.0))
+        marge.value = str(p.get("marge_spires", 0.0))
         page.update()
 
     constructeur = ft.Dropdown(
@@ -182,8 +186,16 @@ def main(page: ft.Page):
             p_u1 = float(u1.value)
             p_u2 = float(u2.value)
             p_larg = float(largeur.value)
+            # Conversion automatique si l'utilisateur saisit le diamètre en mm (ex: 135 au lieu de 13.5)
+            if p_larg > 50:
+                p_larg = p_larg / 10.0
+
             p_toles = int(toles.value)
             p_ep = float(epaisseur.value)
+            # Conversion automatique si l'utilisateur saisit l'épaisseur en centièmes (ex: 30 au lieu de 0.30)
+            if p_ep > 2:
+                p_ep = p_ep / 100.0
+
             p_etages = int(etages.value)
 
             profil = PROFILS_CONSTRUCTEURS.get(
@@ -231,7 +243,7 @@ def main(page: ft.Page):
             ep_mep, larg_mep = estimer_meplat(sec_bt)
 
             res_text.value = (
-                f"Section Fer (Sfer) : {s_fer_cm2:.2f} cm² ({p_etages} étages)\n"
+                f"Section Fer nette (Sfer) : {s_fer_cm2:.2f} cm² ({p_etages} étages)\n"
                 f"Tension par spire (Et) : {e_t:.3f} V/spire\n"
                 f"Spires BT (N2) : {info_bt}\n"
                 f"Spires HT (N1) : {n1} spires\n"
