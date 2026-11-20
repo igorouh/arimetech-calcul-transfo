@@ -267,7 +267,7 @@ def main(page: ft.Page):
                     constructeur,
                     marge,
                     spires_bt_rec,
-                    ft.ElevatedButton(
+                    ft.Button(
                         "CALCULER LE DIMENSIONNEMENT",
                         on_click=executer_calcul,
                         style=ft.ButtonStyle(
@@ -281,7 +281,7 @@ def main(page: ft.Page):
                     ft.Row(
                         [
                             conv_alu,
-                            ft.ElevatedButton(
+                            ft.Button(
                                 "Convertir", on_click=executer_conversion
                             ),
                         ]
