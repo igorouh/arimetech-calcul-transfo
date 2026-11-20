@@ -152,7 +152,7 @@ def main(page: ft.Page):
         label="Constructeur",
         value="Cahors / Transfix",
         options=[ft.dropdown.Option(k) for k in PROFILS_CONSTRUCTEURS.keys()],
-        on_change=changer_constructeur,
+        on_select=changer_constructeur,
     )
 
     # Conversion rapide
@@ -248,7 +248,7 @@ def main(page: ft.Page):
     page.add(
         ft.AppBar(
             title=ft.Text("DIMENSIONNEMENT TRANSFO HTA/BT"),
-            bg_color="#1E3A8A",
+            bgcolor="#1E3A8A",
             color="white",
         ),
         ft.Container(
@@ -271,7 +271,7 @@ def main(page: ft.Page):
                         "CALCULER LE DIMENSIONNEMENT",
                         on_click=executer_calcul,
                         style=ft.ButtonStyle(
-                            bg_color="#10B981", color="white"
+                            bgcolor="#10B981", color="white"
                         ),
                     ),
                     ft.Divider(),
